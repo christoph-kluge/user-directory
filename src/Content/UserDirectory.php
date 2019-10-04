@@ -6,6 +6,7 @@ use Flarum\Api\Controller\ListUsersController;
 use Flarum\Frontend\Document;
 use Flarum\Http\Exception\RouteNotFoundException;
 use Flarum\Api\Client;
+use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
 use Illuminate\Contracts\View\Factory;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -23,6 +24,11 @@ class UserDirectory
     private $view;
 
     /**
+     * @var SettingsRepositoryInterface
+     */
+    private $settings;
+
+    /**
      * A map of sort query param values to their API sort param.
      *
      * @var array
@@ -38,16 +44,22 @@ class UserDirectory
         'least_discussions' => 'discussionCount'
     ];
 
-    public function __construct(Client $api, Factory $view)
+    public function __construct(Client $api, Factory $view, SettingsRepositoryInterface $settings)
     {
         $this->api = $api;
         $this->view = $view;
+        $this->settings = $settings;
     }
 
     private function getDocument(User $actor, array $params)
     {
         if ($actor->cannot('fof.user-directory.view')) {
             throw new RouteNotFoundException();
+        }
+
+        $visibleGroups = $this->settings->get('fof.user-directory.visible_groups');
+        if ($visibleGroups != '-1') {
+            $params['notGroup'] = $visibleGroups;
         }
 
         return json_decode($this->api->send(ListUsersController::class, $actor, $params)->getBody());
